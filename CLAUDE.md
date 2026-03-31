@@ -9,8 +9,10 @@ RTU UDP System V1.1.0 — a Python-based Remote Terminal Unit (RTU) implementing
 ## Running the System
 
 ```bash
-# Install dependencies (only pymodbus for real hardware; optional)
-pip install -r requirements.txt
+# Dependencies — each component has its own requirements.txt (no top-level one)
+pip install pymodbus                            # RTU client (optional — simulation mode if absent)
+pip install -r web_server_prod/requirements.txt # Production dashboard
+pip install -r model_maker_web/backend/requirements.txt  # Web-based Model Maker
 
 # Run the RTU client (simulation mode if pymodbus absent or no serial port)
 python -m rtu_program.rtu_client
@@ -40,7 +42,8 @@ All batch launchers are in `launchers/`:
 - `START_UDP_SERVER.bat` — 운영 UDP 서버 (auto-restart)
 - `START_TEST_SERVER.bat` — 테스트 UDP 서버
 - `START_SIMULATOR.bat` — 장비 시뮬레이터
-- `START_MODEL_MAKER.bat` — 레지스터맵 생성기 (auto-installs PyMuPDF, openpyxl, anthropic)
+- `START_MODEL_MAKER.bat` — 레지스터맵 생성기 GUI (auto-installs PyMuPDF, openpyxl, anthropic)
+- `START_MODEL_MAKER_WEB.bat` — 레지스터맵 생성기 Web UI (model_maker_web/)
 - `INSTALL_RTU_DEV.bat` — RTU 원클릭 설치 (305-line comprehensive setup)
 - `SETUP_CM4_BOOT.bat` — CM4 부트 설정
 
@@ -71,6 +74,7 @@ There is no build step, no test runner, and no lint configuration.
 - **`pc_programs/der_avm_master.py`** — DER-AVM master control utility for testing slave integration.
 - **`web_server_prod/`** — Production dashboard (FastAPI + SQLite WAL + WebSocket + React 18 frontend). Env vars: `RTU_UDP_PORT`, `RTU_WEB_PORT`, `RTU_DB_PATH`, `RTU_FTP_USER`, `RTU_FTP_PASS`. Includes SFTP path whitelist, duplicate detection, rate limiting, data retention, stale RTU detection.
 - **`model_maker/`** — GUI tool for generating register maps from inverter Modbus PDFs. Main file: `modbus_to_udp_mapper.py` (8,500+ lines). 3-stage pipeline (`stage_pipeline.py`) with optional AI assist (`ai_generator.py`).
+- **`model_maker_web/`** — Web-based version of Model Maker (FastAPI backend + React frontend). Backend in `model_maker_web/backend/`; shares the same core pipeline as the GUI version. Uses Anthropic SDK for AI-assisted register extraction.
 
 ### Communication Flow
 
@@ -113,6 +117,20 @@ All packets share a **20-byte header**: Version(1) + Sequence(2) + RTU_ID(4) + T
 | Weather Station | SEM5046 | `weather` |
 
 Device configuration in `config/rs485_ch*.ini`. Model-to-protocol mapping in `config/device_models.ini`.
+
+## Documentation
+
+Korean-language manuals are in `manuals/` covering all major components:
+- `01_CM4_RTU_포팅_가이드.md` — CM4 Linux setup and boot configuration
+- `02_RTU_클라이언트.md` — RTU client operation and INI configuration
+- `03_운영_대시보드.md` — Dashboard operation
+- `04_UDP_서버.md` — UDP server setup
+- `05_테스트_서버.md` — Test server usage and H03 command menu
+- `06_장비_시뮬레이터.md` — Equipment simulator configuration
+- `07_모델_메이커.md` — Model Maker detailed guide
+- `08_DER_AVM.md` — DER-AVM master/slave integration
+
+Hardware development notes (CM4 pin maps, GPIO, RS485 board specs) are in `hw_dev/`.
 
 ## RTU 수정 시 필수 절차
 
