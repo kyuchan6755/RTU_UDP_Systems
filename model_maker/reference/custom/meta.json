@@ -1,0 +1,7 @@
+{
+  "protocol": "custom",
+  "mapping_excel": "C:\\Users\\kyuch\\Solarize\\CM4_4RS485\\RTU_UDP\\V1_1_0\\.claude\\worktrees\\pensive-shannon\\model_maker\\reference\\custom\\mapping.xlsx",
+  "py_file": "C:\\Users\\kyuch\\Solarize\\CM4_4RS485\\RTU_UDP\\V1_1_0\\.claude\\worktrees\\pensive-shannon\\model_maker\\reference\\custom\\registers.py",
+  "created": "2026-03-31T15:29:57.959319",
+  "builtin": false
+}

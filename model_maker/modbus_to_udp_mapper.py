@@ -111,6 +111,11 @@ def parse_modbus_pdf(filepath):
             raise ImportError("Huawei PDF 파싱에는 PyMuPDF가 필요합니다.\n"
                               "'pip install PyMuPDF' 를 실행하세요.")
         all_regs = _parse_huawei_registers_from_tables(filepath)
+    elif manufacturer == 'GoodWe':
+        if not _has_fitz:
+            raise ImportError("GoodWe PDF 파싱에는 PyMuPDF가 필요합니다.\n"
+                              "'pip install PyMuPDF' 를 실행하세요.")
+        all_regs = _parse_goodwe_registers_from_tables(filepath)
     else:
         # Synergy(VerterKing) 및 기타
         all_regs = _parse_register_tables(pages_text, full_text)
@@ -815,6 +820,136 @@ def _parse_huawei_tables(doc):
                     'unit': unit,
                     'rw': rw,
                     'comment': scope[:120] if scope else '',
+                }
+                registers.append(reg)
+
+    return registers
+
+
+# ---------------------------------------------------------------------------
+# GoodWe PDF parser (PyMuPDF find_tables)
+# ---------------------------------------------------------------------------
+
+def _parse_goodwe_registers_from_tables(filepath):
+    """
+    GoodWe PDF의 테이블을 PyMuPDF find_tables()로 직접 추출.
+    각 테이블 행 (9컬럼): [Address(Dec), EnglishName, R/W, Type, Length, SF_Gain, Units, Range, Note]
+    """
+    import fitz
+
+    doc = fitz.open(filepath)
+    try:
+        return _parse_goodwe_tables(doc)
+    finally:
+        doc.close()
+
+
+def _parse_goodwe_tables(doc):
+    registers = []
+    seen_addrs = set()
+    entry_no = 0
+
+    type_map = {
+        'U16': 'U16', 'U32': 'U32',
+        'S16': 'S16', 'S32': 'S32',
+        'STR': 'string', 'STRING': 'string',
+        'I16': 'S16', 'I32': 'S32',
+    }
+
+    for page_idx in range(len(doc)):
+        page = doc[page_idx]
+        tables = page.find_tables()
+        if not tables.tables:
+            continue
+
+        for table in tables.tables:
+            rows = table.extract()
+            # 9컬럼 테이블만 레지스터 테이블로 인식
+            if not rows or len(rows[0]) != 9:
+                continue
+
+            for row in rows:
+                if len(row) < 9:
+                    continue
+
+                # col 0: Address (Dec) — 순수 숫자만 취함
+                addr_raw = (row[0] or '').replace('\n', ' ').strip()
+                # 헤더 행/continuation 행 스킵
+                if not addr_raw or not re.match(r'^\d{1,5}$', addr_raw):
+                    continue
+
+                addr_val = int(addr_raw)
+
+                # 중복 방지
+                if addr_val in seen_addrs:
+                    continue
+                seen_addrs.add(addr_val)
+
+                entry_no += 1
+
+                # col 1: English Name → definition
+                definition = (row[1] or '').replace('\n', ' ').strip()
+
+                # col 2: R/W
+                rw = (row[2] or '').replace('\n', '').replace('#', '').strip()
+                if rw not in ('RO', 'RW', 'WO'):
+                    rw = 'RO'
+
+                # col 3: Type
+                raw_type = (row[3] or '').replace('\n', '').strip()
+                reg_type = type_map.get(raw_type.upper(), raw_type)
+
+                # col 4: Length (레지스터 수)
+                regs_str = (row[4] or '').replace('\n', '').strip()
+                try:
+                    num_regs = int(regs_str)
+                except (ValueError, TypeError):
+                    num_regs = 1
+
+                # col 5: SF Gain → scale_factor
+                sf_raw = (row[5] or '').replace('\n', '').strip()
+                scale_factor = sf_raw if sf_raw else ''
+
+                # col 6: Units
+                unit = (row[6] or '').replace('\n', ' ').strip()
+
+                # col 7 + col 8: Range + Note → comment
+                range_str = (row[7] or '').replace('\n', ' ').strip()
+                note_str = (row[8] or '').replace('\n', ' ').strip()
+                comment_parts = [p for p in (range_str, note_str) if p]
+                comment = ' | '.join(comment_parts)[:120]
+
+                # FC Code: R/W에서 결정
+                if rw == 'RO':
+                    fc_code = 'FC03'
+                elif rw == 'WO':
+                    fc_code = 'FC06'
+                else:
+                    fc_code = 'FC03/FC06'
+
+                # 섹션 결정 (주소 범위)
+                if addr_val < 256:
+                    section = 'Inverter Parameters (Setup)'
+                elif addr_val < 512:
+                    section = 'Control Parameters'
+                elif addr_val < 768:
+                    section = 'Device Information (System Info)'
+                else:
+                    section = 'Inverter Realtime Data'
+
+                reg = {
+                    'index': entry_no,
+                    'section': section,
+                    'definition': definition,
+                    'address': addr_val,
+                    'address_hex': f"0x{addr_val:04X}",
+                    'regs': num_regs,
+                    'type': reg_type,
+                    'unit': unit,
+                    'scale_factor': scale_factor,
+                    'rw': rw,
+                    'fc_code': fc_code,
+                    'comment': comment,
                 }
                 registers.append(reg)
 
