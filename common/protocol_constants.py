@@ -24,7 +24,7 @@ Changes in 1.0.6 (UDP):
 # Protocol Version
 # =============================================================================
 PROTOCOL_VERSION = "V3.0.1"
-PROGRAM_VERSION = "2.2.0"
+PROGRAM_VERSION = "2.2.1"
 
 # =============================================================================
 # Network Configuration
